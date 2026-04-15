@@ -2,25 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Lawn Mower Game</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+    }
 
     body {
       background: #1a1a2e;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+      justify-content: flex-start;
       font-family: 'Courier New', monospace;
       color: #fff;
+      height: 100dvh;
     }
 
     h1 {
-      font-size: 2rem;
-      margin-bottom: 12px;
+      font-size: clamp(1rem, 4vw, 1.8rem);
+      margin: 8px 0 4px;
       color: #a8e063;
       text-shadow: 0 0 10px #56ab2f88;
       letter-spacing: 2px;
@@ -28,14 +33,14 @@
 
     #hud {
       display: flex;
-      gap: 40px;
-      margin-bottom: 12px;
-      font-size: 1.1rem;
+      gap: 16px;
+      margin-bottom: 6px;
+      font-size: clamp(0.75rem, 3vw, 1rem);
     }
 
     #hud span {
       background: #0f3460;
-      padding: 6px 18px;
+      padding: 4px 14px;
       border-radius: 8px;
       border: 1px solid #a8e063;
     }
@@ -56,47 +61,90 @@
       border-radius: 4px;
       box-shadow: 0 0 20px #56ab2f44;
       display: block;
+      max-width: 100%;
+      max-height: 100%;
     }
 
+    /* D-pad */
+    #dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(3, 56px);
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    #dpad button {
+      background: #0f3460cc;
+      border: 2px solid #a8e063;
+      border-radius: 10px;
+      color: #a8e063;
+      font-size: 1.4rem;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s;
+    }
+
+    #dpad button:active,
+    #dpad button.pressed {
+      background: #56ab2faa;
+      color: #fff;
+    }
+
+    #dpad .empty { background: transparent; border: none; }
+
     #controls {
-      margin-top: 12px;
-      font-size: 0.8rem;
-      color: #aaa;
+      margin-top: 6px;
+      font-size: 0.7rem;
+      color: #666;
+    }
+
+    /* hide keyboard hint on touch devices */
+    @media (hover: none) {
+      #controls { display: none; }
     }
 
     #overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.75);
+      z-index: 10;
+      background: rgba(0,0,0,0.82);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 12px;
+      padding: 20px;
+      text-align: center;
     }
 
     #overlay.hidden { display: none; }
 
     #overlay h2 {
-      font-size: 2.5rem;
+      font-size: clamp(1.5rem, 6vw, 2.5rem);
       color: #a8e063;
     }
 
     #overlay p {
-      font-size: 1.3rem;
+      font-size: clamp(0.9rem, 3.5vw, 1.2rem);
       color: #eee;
     }
 
     #overlay .big {
-      font-size: 4rem;
+      font-size: clamp(2.5rem, 12vw, 4rem);
       color: #fff;
       font-weight: bold;
     }
 
     #overlay button {
-      margin-top: 10px;
-      padding: 12px 32px;
-      font-size: 1.1rem;
+      margin-top: 8px;
+      padding: 14px 36px;
+      font-size: clamp(1rem, 4vw, 1.1rem);
       font-family: inherit;
       background: #56ab2f;
       color: #fff;
@@ -104,10 +152,12 @@
       border-radius: 8px;
       cursor: pointer;
       letter-spacing: 1px;
-      transition: background 0.2s;
+      touch-action: manipulation;
+      position: relative;
+      z-index: 11;
     }
 
-    #overlay button:hover { background: #a8e063; color: #1a1a2e; }
+    #overlay button:active { background: #a8e063; color: #1a1a2e; }
   </style>
 </head>
 <body>
@@ -118,12 +168,23 @@
   <span id="mowed-display">Mowed: 0%</span>
 </div>
 <canvas id="canvas"></canvas>
+<div id="dpad">
+  <div class="empty"></div>
+  <button id="btn-up"    data-dx="0"  data-dy="-1">▲</button>
+  <div class="empty"></div>
+  <button id="btn-left"  data-dx="-1" data-dy="0">◀</button>
+  <div class="empty"></div>
+  <button id="btn-right" data-dx="1"  data-dy="0">▶</button>
+  <div class="empty"></div>
+  <button id="btn-down"  data-dx="0"  data-dy="1">▼</button>
+  <div class="empty"></div>
+</div>
 <div id="controls">Arrow keys or WASD to move</div>
 
 <div id="overlay">
   <h2>LAWN MOWER</h2>
   <p>Mow as much grass as you can in 30 seconds!</p>
-  <p style="color:#aaa; font-size:0.95rem;">Arrow keys or WASD to move</p>
+  <p style="color:#aaa; font-size:0.9rem;">Arrow keys, WASD, or the buttons below</p>
   <button id="start-btn">START MOWING</button>
 </div>
 
@@ -135,21 +196,37 @@
   const timerDisplay = document.getElementById('timer-display');
   const mowedDisplay = document.getElementById('mowed-display');
 
-  const TILE = 28;
   const COLS = 24;
   const ROWS = 18;
 
-  canvas.width  = COLS * TILE;
-  canvas.height = ROWS * TILE;
+  // Fit canvas to available screen space
+  function calcTile() {
+    const maxW = window.innerWidth - 8;
+    const dpadH = 56 * 3 + 4 * 2 + 10 + 6; // dpad + margins
+    const hudH = 80;
+    const maxH = window.innerHeight - hudH - dpadH - 8;
+    return Math.max(4, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+  }
+
+  let TILE = calcTile();
+
+  function resizeCanvas() {
+    TILE = calcTile();
+    canvas.width  = COLS * TILE;
+    canvas.height = ROWS * TILE;
+    render();
+  }
+
+  window.addEventListener('resize', resizeCanvas);
 
   // Game state
-  let grid = [];       // true = mowed
+  let grid = [];
   let player = { x: 0, y: 0 };
   let timeLeft = 30;
   let gameRunning = false;
   let timerInterval = null;
   let lastMove = 0;
-  const MOVE_DELAY = 50; // ms between moves when holding a key
+  const MOVE_DELAY = 50;
 
   const GRASS_DARK  = '#2e7d32';
   const GRASS_LIGHT = '#43a047';
@@ -163,9 +240,7 @@
     grid = [];
     for (let r = 0; r < ROWS; r++) {
       grid[r] = [];
-      for (let c = 0; c < COLS; c++) {
-        grid[r][c] = false;
-      }
+      for (let c = 0; c < COLS; c++) grid[r][c] = false;
     }
   }
 
@@ -178,19 +253,15 @@
   }
 
   function drawTile(c, r) {
-    const x = c * TILE;
-    const y = r * TILE;
+    const x = c * TILE, y = r * TILE;
     const mowed = grid[r][c];
-
-    // Checkerboard base color
     const even = (c + r) % 2 === 0;
     ctx.fillStyle = mowed
       ? (even ? MOWED_DARK : MOWED_LIGHT)
       : (even ? GRASS_DARK : GRASS_LIGHT);
     ctx.fillRect(x, y, TILE, TILE);
 
-    if (!mowed) {
-      // Draw a few grass blades
+    if (!mowed && TILE >= 12) {
       ctx.strokeStyle = even ? '#388e3c' : '#4caf50';
       ctx.lineWidth = 1.5;
       const blades = [[0.25, 0.7, 0.25, 0.2], [0.5, 0.75, 0.45, 0.15], [0.75, 0.72, 0.78, 0.22]];
@@ -204,35 +275,25 @@
   }
 
   function drawPlayer() {
-    const px = player.x * TILE;
-    const py = player.y * TILE;
-    const s = TILE;
-
-    // Body
+    const px = player.x * TILE, py = player.y * TILE, s = TILE;
     ctx.fillStyle = PLAYER_COLOR;
     ctx.beginPath();
     ctx.roundRect(px + 3, py + 4, s - 6, s - 10, 4);
     ctx.fill();
 
-    // Handle bar
     ctx.strokeStyle = '#bf360c';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = Math.max(2, s / 14);
     ctx.beginPath();
-    ctx.moveTo(px + s * 0.2, py + 4);
-    ctx.lineTo(px + s * 0.2, py - 4);
-    ctx.moveTo(px + s * 0.8, py + 4);
-    ctx.lineTo(px + s * 0.8, py - 4);
-    ctx.moveTo(px + s * 0.2, py - 4);
-    ctx.lineTo(px + s * 0.8, py - 4);
+    ctx.moveTo(px + s * 0.2, py + 4); ctx.lineTo(px + s * 0.2, py - 4);
+    ctx.moveTo(px + s * 0.8, py + 4); ctx.lineTo(px + s * 0.8, py - 4);
+    ctx.moveTo(px + s * 0.2, py - 4); ctx.lineTo(px + s * 0.8, py - 4);
     ctx.stroke();
 
-    // Blade (bottom)
     ctx.fillStyle = BLADE_COLOR;
     ctx.beginPath();
     ctx.ellipse(px + s / 2, py + s - 8, s * 0.35, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wheels
     ctx.fillStyle = WHEEL_COLOR;
     [[0.15, 0.55], [0.85, 0.55]].forEach(([wx, wy]) => {
       ctx.beginPath();
@@ -243,11 +304,10 @@
 
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    if (!grid.length) return;
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
         drawTile(c, r);
-
     drawPlayer();
   }
 
@@ -260,10 +320,8 @@
   function endGame() {
     gameRunning = false;
     clearInterval(timerInterval);
-
     const pct = mowedPercent();
-    let grade = pct >= 90 ? 'PERFECT!' : pct >= 70 ? 'Great job!' : pct >= 50 ? 'Not bad!' : 'Keep practicing!';
-
+    const grade = pct >= 90 ? 'PERFECT!' : pct >= 70 ? 'Great job!' : pct >= 50 ? 'Not bad!' : 'Keep practicing!';
     overlay.innerHTML = `
       <h2>TIME'S UP!</h2>
       <p>${grade}</p>
@@ -277,16 +335,13 @@
 
   function startGame() {
     initGrid();
-    player.x = 0;
-    player.y = 0;
+    player.x = 0; player.y = 0;
     grid[0][0] = true;
     timeLeft = 30;
     gameRunning = true;
     overlay.classList.add('hidden');
-
     updateHUD();
     render();
-
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
       timeLeft--;
@@ -295,36 +350,84 @@
     }, 1000);
   }
 
-  // Input handling
+  // Keyboard input
   const keys = {};
-  document.addEventListener('keydown', e => { keys[e.key] = true; });
+  document.addEventListener('keydown', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
   document.addEventListener('keyup',   e => { keys[e.key] = false; });
 
   function tryMove(dx, dy) {
-    const nx = player.x + dx;
-    const ny = player.y + dy;
+    const nx = player.x + dx, ny = player.y + dy;
     if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-      player.x = nx;
-      player.y = ny;
+      player.x = nx; player.y = ny;
       grid[ny][nx] = true;
       updateHUD();
       render();
     }
   }
 
-  let lastTime = 0;
+  // D-pad touch/mouse input
+  const dpadButtons = document.querySelectorAll('#dpad button');
+  const heldDir = { dx: 0, dy: 0, active: false };
+  let dpadInterval = null;
+
+  function startHold(dx, dy) {
+    heldDir.dx = dx; heldDir.dy = dy; heldDir.active = true;
+    if (gameRunning) tryMove(dx, dy);
+    clearInterval(dpadInterval);
+    dpadInterval = setInterval(() => {
+      if (heldDir.active && gameRunning) tryMove(heldDir.dx, heldDir.dy);
+    }, MOVE_DELAY);
+  }
+
+  function stopHold() {
+    heldDir.active = false;
+    clearInterval(dpadInterval);
+  }
+
+  dpadButtons.forEach(btn => {
+    const dx = parseInt(btn.dataset.dx);
+    const dy = parseInt(btn.dataset.dy);
+
+    btn.addEventListener('touchstart', e => { e.preventDefault(); btn.classList.add('pressed'); startHold(dx, dy); }, { passive: false });
+    btn.addEventListener('touchend',   e => { e.preventDefault(); btn.classList.remove('pressed'); stopHold(); });
+    btn.addEventListener('mousedown',  e => { btn.classList.add('pressed'); startHold(dx, dy); });
+    btn.addEventListener('mouseup',    e => { btn.classList.remove('pressed'); stopHold(); });
+    btn.addEventListener('mouseleave', e => { btn.classList.remove('pressed'); stopHold(); });
+  });
+
+  // Swipe input on canvas
+  let touchStart = null;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    if (!touchStart || !gameRunning) return;
+    const dx = e.changedTouches[0].clientX - touchStart.x;
+    const dy = e.changedTouches[0].clientY - touchStart.y;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (Math.abs(dx) > Math.abs(dy)) tryMove(dx > 0 ? 1 : -1, 0);
+    else                              tryMove(0, dy > 0 ? 1 : -1);
+    touchStart = null;
+  }, { passive: false });
+
+  let lastTs = 0;
   function gameLoop(ts) {
     requestAnimationFrame(gameLoop);
     if (!gameRunning) return;
-
-    if (ts - lastMove > MOVE_DELAY) {
-      if (keys['ArrowUp']    || keys['w'] || keys['W']) { tryMove(0, -1); lastMove = ts; }
-      else if (keys['ArrowDown']  || keys['s'] || keys['S']) { tryMove(0,  1); lastMove = ts; }
-      else if (keys['ArrowLeft']  || keys['a'] || keys['A']) { tryMove(-1, 0); lastMove = ts; }
-      else if (keys['ArrowRight'] || keys['d'] || keys['D']) { tryMove(1,  0); lastMove = ts; }
+    if (ts - lastTs > MOVE_DELAY) {
+      if      (keys['ArrowUp']    || keys['w'] || keys['W']) { tryMove(0, -1); lastTs = ts; }
+      else if (keys['ArrowDown']  || keys['s'] || keys['S']) { tryMove(0,  1); lastTs = ts; }
+      else if (keys['ArrowLeft']  || keys['a'] || keys['A']) { tryMove(-1, 0); lastTs = ts; }
+      else if (keys['ArrowRight'] || keys['d'] || keys['D']) { tryMove(1,  0); lastTs = ts; }
     }
   }
 
+  resizeCanvas();
   startBtn.addEventListener('click', startGame);
   requestAnimationFrame(gameLoop);
 </script>
