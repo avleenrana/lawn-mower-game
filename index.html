@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lawn Mower Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      color: #a8e063;
+      text-shadow: 0 0 10px #56ab2f88;
+      letter-spacing: 2px;
+    }
+
+    #hud {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 12px;
+      font-size: 1.1rem;
+    }
+
+    #hud span {
+      background: #0f3460;
+      padding: 6px 18px;
+      border-radius: 8px;
+      border: 1px solid #a8e063;
+    }
+
+    #hud span.warning {
+      border-color: #ff6b6b;
+      color: #ff6b6b;
+      animation: pulse 0.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { opacity: 1; }
+      to { opacity: 0.5; }
+    }
+
+    canvas {
+      border: 3px solid #a8e063;
+      border-radius: 4px;
+      box-shadow: 0 0 20px #56ab2f44;
+      display: block;
+    }
+
+    #controls {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    #overlay.hidden { display: none; }
+
+    #overlay h2 {
+      font-size: 2.5rem;
+      color: #a8e063;
+    }
+
+    #overlay p {
+      font-size: 1.3rem;
+      color: #eee;
+    }
+
+    #overlay .big {
+      font-size: 4rem;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    #overlay button {
+      margin-top: 10px;
+      padding: 12px 32px;
+      font-size: 1.1rem;
+      font-family: inherit;
+      background: #56ab2f;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.2s;
+    }
+
+    #overlay button:hover { background: #a8e063; color: #1a1a2e; }
+  </style>
+</head>
+<body>
+
+<h1>LAWN MOWER</h1>
+<div id="hud">
+  <span id="timer-display">Time: 30s</span>
+  <span id="mowed-display">Mowed: 0%</span>
+</div>
+<canvas id="canvas"></canvas>
+<div id="controls">Arrow keys or WASD to move</div>
+
+<div id="overlay">
+  <h2>LAWN MOWER</h2>
+  <p>Mow as much grass as you can in 30 seconds!</p>
+  <p style="color:#aaa; font-size:0.95rem;">Arrow keys or WASD to move</p>
+  <button id="start-btn">START MOWING</button>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('start-btn');
+  const timerDisplay = document.getElementById('timer-display');
+  const mowedDisplay = document.getElementById('mowed-display');
+
+  const TILE = 28;
+  const COLS = 24;
+  const ROWS = 18;
+
+  canvas.width  = COLS * TILE;
+  canvas.height = ROWS * TILE;
+
+  // Game state
+  let grid = [];       // true = mowed
+  let player = { x: 0, y: 0 };
+  let timeLeft = 30;
+  let gameRunning = false;
+  let timerInterval = null;
+  let lastMove = 0;
+  const MOVE_DELAY = 50; // ms between moves when holding a key
+
+  const GRASS_DARK  = '#2e7d32';
+  const GRASS_LIGHT = '#43a047';
+  const MOWED_DARK  = '#8d6e63';
+  const MOWED_LIGHT = '#a1887f';
+  const PLAYER_COLOR = '#ff6f00';
+  const WHEEL_COLOR  = '#212121';
+  const BLADE_COLOR  = '#ffe082';
+
+  function initGrid() {
+    grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        grid[r][c] = false;
+      }
+    }
+  }
+
+  function mowedPercent() {
+    let count = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (grid[r][c]) count++;
+    return Math.round((count / (ROWS * COLS)) * 100);
+  }
+
+  function drawTile(c, r) {
+    const x = c * TILE;
+    const y = r * TILE;
+    const mowed = grid[r][c];
+
+    // Checkerboard base color
+    const even = (c + r) % 2 === 0;
+    ctx.fillStyle = mowed
+      ? (even ? MOWED_DARK : MOWED_LIGHT)
+      : (even ? GRASS_DARK : GRASS_LIGHT);
+    ctx.fillRect(x, y, TILE, TILE);
+
+    if (!mowed) {
+      // Draw a few grass blades
+      ctx.strokeStyle = even ? '#388e3c' : '#4caf50';
+      ctx.lineWidth = 1.5;
+      const blades = [[0.25, 0.7, 0.25, 0.2], [0.5, 0.75, 0.45, 0.15], [0.75, 0.72, 0.78, 0.22]];
+      for (const [x1, y1, x2, y2] of blades) {
+        ctx.beginPath();
+        ctx.moveTo(x + x1 * TILE, y + y1 * TILE);
+        ctx.lineTo(x + x2 * TILE, y + y2 * TILE);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawPlayer() {
+    const px = player.x * TILE;
+    const py = player.y * TILE;
+    const s = TILE;
+
+    // Body
+    ctx.fillStyle = PLAYER_COLOR;
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 4, s - 6, s - 10, 4);
+    ctx.fill();
+
+    // Handle bar
+    ctx.strokeStyle = '#bf360c';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.2, py + 4);
+    ctx.lineTo(px + s * 0.2, py - 4);
+    ctx.moveTo(px + s * 0.8, py + 4);
+    ctx.lineTo(px + s * 0.8, py - 4);
+    ctx.moveTo(px + s * 0.2, py - 4);
+    ctx.lineTo(px + s * 0.8, py - 4);
+    ctx.stroke();
+
+    // Blade (bottom)
+    ctx.fillStyle = BLADE_COLOR;
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s - 8, s * 0.35, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wheels
+    ctx.fillStyle = WHEEL_COLOR;
+    [[0.15, 0.55], [0.85, 0.55]].forEach(([wx, wy]) => {
+      ctx.beginPath();
+      ctx.ellipse(px + wx * s, py + wy * s, 4, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        drawTile(c, r);
+
+    drawPlayer();
+  }
+
+  function updateHUD() {
+    timerDisplay.textContent = `Time: ${timeLeft}s`;
+    timerDisplay.className = timeLeft <= 5 ? 'warning' : '';
+    mowedDisplay.textContent = `Mowed: ${mowedPercent()}%`;
+  }
+
+  function endGame() {
+    gameRunning = false;
+    clearInterval(timerInterval);
+
+    const pct = mowedPercent();
+    let grade = pct >= 90 ? 'PERFECT!' : pct >= 70 ? 'Great job!' : pct >= 50 ? 'Not bad!' : 'Keep practicing!';
+
+    overlay.innerHTML = `
+      <h2>TIME'S UP!</h2>
+      <p>${grade}</p>
+      <div class="big">${pct}%</div>
+      <p>of the lawn mowed</p>
+      <button id="start-btn">PLAY AGAIN</button>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('start-btn').addEventListener('click', startGame);
+  }
+
+  function startGame() {
+    initGrid();
+    player.x = 0;
+    player.y = 0;
+    grid[0][0] = true;
+    timeLeft = 30;
+    gameRunning = true;
+    overlay.classList.add('hidden');
+
+    updateHUD();
+    render();
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      updateHUD();
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  // Input handling
+  const keys = {};
+  document.addEventListener('keydown', e => { keys[e.key] = true; });
+  document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+  function tryMove(dx, dy) {
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+      player.x = nx;
+      player.y = ny;
+      grid[ny][nx] = true;
+      updateHUD();
+      render();
+    }
+  }
+
+  let lastTime = 0;
+  function gameLoop(ts) {
+    requestAnimationFrame(gameLoop);
+    if (!gameRunning) return;
+
+    if (ts - lastMove > MOVE_DELAY) {
+      if (keys['ArrowUp']    || keys['w'] || keys['W']) { tryMove(0, -1); lastMove = ts; }
+      else if (keys['ArrowDown']  || keys['s'] || keys['S']) { tryMove(0,  1); lastMove = ts; }
+      else if (keys['ArrowLeft']  || keys['a'] || keys['A']) { tryMove(-1, 0); lastMove = ts; }
+      else if (keys['ArrowRight'] || keys['d'] || keys['D']) { tryMove(1,  0); lastMove = ts; }
+    }
+  }
+
+  startBtn.addEventListener('click', startGame);
+  requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
